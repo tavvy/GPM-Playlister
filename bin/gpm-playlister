@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var pkg = require('../package.json');
+var app = require('../lib/app');
+var login = require('../lib/login');
+
+program
+	.version(pkg.version)
+
+
+program
+	.command('create <url>')
+	.description('create a playlist')
+	.usage('[options] <url | station>')
+	.option('-s, --station', 'lazy option provide station [1, 1x, 2, 3, 4, 5, 6]')
+	.option('-g, --guided', 'user selection if we cant find match')
+	.action(function(url, options) {
+		var opts = mapExec(url, options);
+		app(opts);
+	});
+
+program
+	.command('login <username> <password>')
+	.usage('<username> <password>')
+	.description('login to google music')
+	.action(function(username, password, options){
+		login(username, password, options);
+	});
+
+program.parse(process.argv);
+
+if (!program.args.length) {
+	// program.help();
+}
+
+function mapExec(url, options) {
+	var opts = {
+		url: options.station ? null : url,
+		station: options.station ? url : null,
+		guided: options.guided || null
+	}
+	return opts;
+}

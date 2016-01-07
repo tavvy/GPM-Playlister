@@ -1,0 +1,28 @@
+{
+  "name": "gpm-playlister",
+  "version": "1.0.0",
+  "description": "a node application to generate google music playlists from BBC playlister",
+  "main": ".lib/app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "tavvy",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-cli": "^6.4.0",
+    "jscs": "^2.8.0",
+    "jshint": "^2.9.1-rc3"
+  },
+  "dependencies": {
+    "async": "^1.5.2",
+    "chalk": "^1.1.1",
+    "cheerio": "^0.19.0",
+    "commander": "^2.9.0",
+    "playmusic": "^2.1.1",
+    "readline-sync": "^1.2.22",
+    "request-promise": "^1.0.2"
+  },
+  "bin": {
+    "gpm-playlister": "./bin/gpm-playlister"
+  }
+}
