@@ -15,4 +15,4 @@ branches:
 
 # Build script
 script:
-  - 'if [ $LINT ]; npm run lint; fi'
+  - 'if [ $LINT ]; then npm run lint; fi'

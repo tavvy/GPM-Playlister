@@ -3,13 +3,9 @@
   "version": "1.0.0",
   "description": "a node application to generate google music playlists from BBC playlister",
   "main": ".lib/app.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": "tavvy",
   "license": "ISC",
   "devDependencies": {
-    "babel-cli": "^6.4.0",
     "jscs": "^2.8.0",
     "jshint": "^2.9.1-rc3"
   },
@@ -24,5 +20,9 @@
   },
   "bin": {
     "gpm-playlister": "./bin/gpm-playlister"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "./node_modules/.bin/jshint . && ./node_modules/.bin/jscs ."
   }
 }
