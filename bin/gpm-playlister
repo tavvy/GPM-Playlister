@@ -16,6 +16,7 @@ program
 	.usage('<url>||<station-name>')
 	.option('-s, --station', 'lazy option provide station [1, 1x, 2, 3, 4, 5, 6]')
 	.option('-g, --guided', 'user selection if we cant find match')
+	.option('-r, --replace', 'replace existing matcing gpm playlist')
 	.action(function(url, options) {
 		var opts = mapExec(url, options);
 		app(opts);
@@ -48,7 +49,8 @@ function mapExec(url, options) {
 	var opts = {
 		url: options.station ? null : url,
 		station: options.station ? url : null,
-		guided: options.guided || null
+		guided: options.guided || null,
+		replaceExisting: options.replace ? true : false
 	}
 	return opts;
 }

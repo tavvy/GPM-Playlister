@@ -5,7 +5,8 @@
 		"track_selector": "li.plr-playlist-trackslist-track",
 		"artist_selector": ".plr-playlist-trackslist-track-name-artistlink",
 		"alt_artist_selector": ".plr-playlist-trackslist-track-name-artist",
-		"title_selector": ".plr-playlist-trackslist-track-name-title"
+		"title_selector": ".plr-playlist-trackslist-track-name-title",
+		"playlist_name": "h1.plr-playlist-header-title"
 	},
 	"bbc_station": {
 		"urlRegex": null,
@@ -13,6 +14,7 @@
 		"track_selector": "div.pll-playlist-item",
 		"artist_selector": "div.pll-playlist-item-artist a",
 		"alt_artist_selector": "div.pll-playlist-item-artist",
-		"title_selector": "div.pll-playlist-item-title"
+		"title_selector": "div.pll-playlist-item-title",
+		"playlist_name": "div.pll-header"
 	}
 }
