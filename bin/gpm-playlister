@@ -49,7 +49,7 @@ function mapExec(url, options) {
 	var opts = {
 		url: options.station ? null : url,
 		station: options.station ? url : null,
-		guided: options.guided || null,
+		guided: options.guided ? true : false,
 		replaceExisting: options.replace ? true : false
 	}
 	return opts;
