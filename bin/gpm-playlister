@@ -5,31 +5,55 @@ var pkg = require('../package.json');
 var app = require('../lib/app');
 var login = require('../lib/login');
 
+/**
+ * GENERAL INFO
+ */
 program
 	.version(pkg.version)
-	.usage('<command> <args>')
-
-
+	.usage('command [options] <argument...>')
+	.description('GPM-Playlister - Generate a Google Music playlist from a BBC Playlister url. Docs: www.github.com/tavvy/GPM-Playlister')
+/**
+ * GENERATE COMMAND
+ */
 program
-	.command('create <url>')
-	.description('create a playlist')
-	.usage('<url>||<station-name>')
-	.option('-s, --station', 'lazy option provide station [1, 1x, 2, 3, 4, 5, 6]')
-	.option('-g, --guided', 'user selection if we cant find match')
-	.option('-r, --replace', 'replace existing matcing gpm playlist')
+	.command('generate <url|station_name>')
+	.option('-s, --station', 'Required when using station name instead of url. see config/stations.json for supported names')
+	.option('-g, --guided', 'Guided mode: ask for help when finding matching search results')
+	.option('-r, --replace', 'Replace existing GPM playlist if there is a match')
 	.action(function(url, options) {
-		var opts = mapExec(url, options);
+		var opts = mapGenerateOpts(url, options);
 		app(opts);
+	})
+	.description('Generate a playlist')
+	.usage('[options] (<url> | <station_name>)')
+	.on('--help', function() {
+		console.log('  Examples:');
+		console.log();
+		console.log('    gpm-playlister generate -s radio1');
+		console.log('    gpm-playlister generate -s -r -g radio1');
+		console.log('    gpm-playlister generate http://www.bbc.co.uk/playlist/zzz11');
+		console.log('    gpm-playlister generate -r -g http://www.bbc.co.uk/playlist/zzz11');
+		console.log();
 	});
-
+/**
+ * LOGIN COMMAND
+ */
 program
-	.command('login <username> <password>')
-	.usage('<username> <password>')
+	.command('login <google_username> <password>')
+	.action(function(username, password){
+		login(username, password);
+	})
 	.description('login to google music')
-	.action(function(username, password, options){
-		login(username, password, options);
+	.usage('<google_username> <password>')
+	.on('--help', function() {
+		console.log('  Examples:');
+		console.log();
+		console.log('    gpm-playlister login example@gmail.com password123');
+		console.log();
 	});
-
+/**
+ * CATCH INVALID COMMANDS
+ */
 program
 	.command("*")
 	.action(function(arg) {
@@ -37,15 +61,31 @@ program
 		program.help();
 	});
 
+program.on('--help', function(){
+	console.log('  Command help:');
+	console.log('');
+	console.log('    gpm-playlister login -h');
+	console.log('    gpm-playlister generate -h');
+	console.log('');
+});
+/**
+ * PARSE ARGV
+ */
 program.parse(process.argv);
-
-if(program.args.length === 0) {
-	console.log("empty/missing command");
+/**
+ * CATCH NO COMMANDS
+ */
+if(!process.argv.slice(2).length) {
 	program.help();
 	process.exit(1);
 }
-
-function mapExec(url, options) {
+/**
+ * MAP GENERATE OPTIONS
+ * @param {String} url - either a url or a station name to look up in config/stations.json for url
+ * @param {Object} options - station, guided, replace
+ * @retuns {Object} opts - mapped and transformed options
+ */
+function mapGenerateOpts(url, options) {
 	var opts = {
 		url: options.station ? null : url,
 		station: options.station ? url : null,
