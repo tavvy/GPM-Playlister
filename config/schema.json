@@ -1,6 +1,5 @@
 {
 	"bbc_playlister": {
-		"urlRegex": null,
 		"tracklist_selector": "ul.plr-playlist-trackslist",
 		"track_selector": "li.plr-playlist-trackslist-track",
 		"artist_selector": ".plr-playlist-trackslist-track-name-artistlink",
@@ -10,7 +9,6 @@
 		"playlist_desc_selector": "p.plr-playlist-description"
 	},
 	"bbc_station": {
-		"urlRegex": null,
 		"tracklist_selector": "div.pll-content",
 		"track_selector": "div.pll-playlist-item",
 		"artist_selector": "div.pll-playlist-item-artist a",
