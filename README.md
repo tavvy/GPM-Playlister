@@ -5,7 +5,7 @@ gpm-playlister generate http://www.bbc.co.uk/playlist/zzzzwj
 gpm-playlister generate -s radioscotland
 ```
 
-![example generate command output](https://cloud.githubusercontent.com/assets/660635/12455093/2dda89ee-bf92-11e5-8f6d-c7125bfed7cd.png)
+![example generate command output](https://cloud.githubusercontent.com/assets/660635/12484040/2be929f6-c050-11e5-892a-253e996b5869.png)
 
 ## Table of contents
 - [Requirements](#requirements)
