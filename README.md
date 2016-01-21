@@ -1,5 +1,5 @@
 # GPM-Playlister
-A command line Node.js tool that generates a [Google Play Music](https://play.google.com/music) playlist from a [BBC Playlister](http://www.bbc.co.uk/music/playlister) url.
+A command line Node.js tool that generates a [Google Play Music](https://play.google.com/music) playlist from a [BBC Playlister](http://www.bbc.co.uk/music/playlists) url.
 ```
 gpm-playlister generate http://www.bbc.co.uk/playlist/zzzzwj
 gpm-playlister generate -s radioscotland
@@ -23,7 +23,10 @@ gpm-playlister generate -s radioscotland
 - A Google Play Music account with these [permissions](https://github.com/jamon/playmusic#authentication)
 
 ## Installation
-**While the project is still under dev**: Clone the repo locally and run `npm install`. Next run `npm install -g` to install GPM-Playlister as a global package.
+```
+npm install -g gpm-playlister
+```
+**Permissions:** *GPM-Playlister* needs to be able to write to the file system ([login](#login)). Using `sudo` to install and when running the `login` command would resolve any permission errors. However it would be better to [fix your npm permissions](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
 
 ## Usage
 ```
@@ -41,7 +44,7 @@ gpm-playlister --help
 ```
 
 ## Login
-First you must login to a valid Google Play Music account.
+First you must authorise *GPM-Playlister* to access your Google Play Music account.
 ```
 gpm-playlister login --help
 
@@ -50,11 +53,11 @@ gpm-playlister login --help
   Example:
     gpm-playlister login example@gmail.com password123
 ```
-Run `login` again to either change or update the stored user account.
+Run `login` again to either change or update the account *GPM-Playlister* is authorised against.
 
 - **Google account using two step authentication:**
 you must use a newly created [app password](https://security.google.com/settings/security/apppasswords), in place of your usual account password.
-  - *Use the 'Select App' dropdown to pick 'Other (Custom Name)', I would suggest using 'GPM-Playlister' as the name. This will generate a password for use with this tool*
+  - *Use the 'Select App' dropdown to pick 'Other (Custom Name)', I would suggest using 'GPM-Playlister' as the name. This will generate a password for use with this tool*.
 
 - **Regular Google accounts:**
 Ensure the "Allow less secure apps" setting is "ON" [found here](https://myaccount.google.com/security#connectedapps).
@@ -62,12 +65,12 @@ Ensure the "Allow less secure apps" setting is "ON" [found here](https://myaccou
 ---
 
 __What does this do?__
-Due to no official GPM API we have to use an [unofficial one](https://github.com/jamon/playmusic#attribution). This will create a mock 'Android' device on your account, which you would be able to see [here](https://security.google.com/settings/security/activity). The mock android id and token is saved locally in: [config/user-data.json](config/user-data.json). **GPM-Playlister** will masquerade as this authorised device. The app __does not__ locally save your username and password.
+Due to no official GPM API we have to use an [unofficial one](https://github.com/jamon/playmusic#attribution). This will create a mock 'Android' device on your account, which you would be able to see [here](https://security.google.com/settings/security/activity). The mock android id and token is saved locally in: [config/user-data.json](config/user-data.json). *GPM-Playlister* will masquerade as this authorised device. The app __does not__ locally save your username and password.
 
 ---
 
 ## Generate
-*Requires a valid stored [login](#login)*
+*Requires authorisation. See: [Login](#login)*
 ```
 gpm-playlister generate --help
 
@@ -90,6 +93,10 @@ Generate will create/replace a playlist in your Google Play Music library contai
  - Fuzzy matching will be used to help resolve common differences in titles, such as the use of a `(Radio Edit)` classification, or using  `feat.` as apposed to `featuring`.
  - Track ordering will be maintained from the source.
 
+### Sources
+- Browse BBC Playlists here: [http://www.bbc.co.uk/music/playlists](http://www.bbc.co.uk/music/playlists)
+- See supported BBC stations here: [config/stations.json](config/stations.json)
+
 ## Options
 
 ### -g --guided Guided mode
@@ -100,7 +107,7 @@ gpm-playlister generate -g http://www.bbc.co.uk/music/playlists/zzzzwj
 ![example guided mode](https://cloud.githubusercontent.com/assets/660635/12455089/2a873cce-bf92-11e5-8291-d56a352ba5a6.jpg)
 
 ### -s --station Station mode
-GPM-Playlister can also generate playlists from the preset stations available in the [config/stations.json](config/stations.json). These are BBC radio playlists that are updated weekly. The following would generate a playlist from the [BBC Radio 1 playlist](http://www.bbc.co.uk/radio1/playlist).
+*GPM-Playlister* can also generate playlists from the preset stations available in the [config/stations.json](config/stations.json). These are BBC radio playlists that are updated weekly. The following would generate a playlist from the [BBC Radio 1 playlist](http://www.bbc.co.uk/radio1/playlist).
 ```
 gpm-playlister generate -s radio1
 ```
@@ -124,9 +131,11 @@ gpm-playlister generate -srg radio1
 ```
 
 ## Example output
-[BBC Radio 6 Playlist source](http://www.bbc.co.uk/6music/playlist) -> [Shared GPM Playlist Output](https://play.google.com/music/playlist/AMaBXykB4DvY268UVOTI770jkvZbPwa2OWMmlUA1hQsN4BWX_dVrHVsuk7XD6lZz4Ml3q8sswF2_SKUL5lNvR7W94aqTr11quw==)
+Station: [BBC Radio 6 Playlist source](http://www.bbc.co.uk/6music/playlist) -> [Shared GPM Playlist Output](https://play.google.com/music/playlist/AMaBXykB4DvY268UVOTI770jkvZbPwa2OWMmlUA1hQsN4BWX_dVrHVsuk7XD6lZz4Ml3q8sswF2_SKUL5lNvR7W94aqTr11quw==)
 
-*Note: This playlist is one generated by myself and shared publicly. It may not always be up-to-date if I haven't re-generated recently*
+BBC Playlist: [David Bowie: A Life In Music source](http://www.bbc.co.uk/music/playlists/zzzzwj) -> [Shared GPM Playlist Output](https://play.google.com/music/playlist/AMaBXynlrdYtuBGhe-iGWG-i36WmKLHCRmobwntRm7-ToJAmhcBxPaRTu1RQh7DiI_1mrFoeXs4PPvqdhkQnzeMBOEqss4k-9g==)
+
+*Note: These playlists are generated by myself and shared publicly. They may not always be up-to-date.*
 
 ## Attribution
 - https://github.com/jamon/playmusic - Google Play Music client for Node
@@ -136,6 +145,9 @@ gpm-playlister generate -srg radio1
 - Write tests
 - Improve fuzzy matching
 - Allow fuzzy matching of artists (Maximo Park -> Max**ï**mo Park)
+- Logout functionality
+- Custom user-data.json location, so that it may persist with updates to the tool
+- Store final report as log file
 
 ## License
 GPM-Playlister is licensed under the [MIT](LICENSE.md) license.

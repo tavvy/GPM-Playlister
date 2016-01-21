@@ -1,7 +1,7 @@
 {
   "name": "gpm-playlister",
-  "version": "1.0.0-beta",
-  "description": "A command line Node.js tool that generates a Google Play Music playlist from a BBC Playlister url",
+  "version": "1.0.0-beta.2",
+  "description": "A command line tool that generates a Google Play Music playlist from a BBC Playlister url",
   "keywords": ["Google Play Music", "Google Music", "BBC Playlister", "BBC Playlist", "Playlist generator", "GPM-Playlister"],
   "homepage": "https://github.com/tavvy/gpm-playlister",
   "bugs": "https://github.com/tavvy/gpm-playlister/issues",
