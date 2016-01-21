@@ -2,7 +2,14 @@
   "name": "gpm-playlister",
   "version": "1.0.0-beta.3",
   "description": "A command line tool that generates a Google Play Music playlist from a BBC Playlister url",
-  "keywords": ["Google Play Music", "Google Music", "BBC Playlister", "BBC Playlist", "Playlist generator", "GPM-Playlister"],
+  "keywords": [
+    "Google Play Music",
+    "Google Music",
+    "BBC Playlister",
+    "BBC Playlist",
+    "Playlist generator",
+    "GPM-Playlister"
+  ],
   "homepage": "https://github.com/tavvy/gpm-playlister",
   "bugs": "https://github.com/tavvy/gpm-playlister/issues",
   "author": {
@@ -13,15 +20,19 @@
     "type": "git",
     "url": "git://github.com/tavvy/gpm-playlister.git"
   },
-  "license": "ISC",
+  "license": "MIT",
+  "engines" : {
+    "node" : ">=0.12.0"
+  },
   "dependencies": {
     "async": "^1.5.2",
     "chalk": "^1.1.1",
     "cheerio": "^0.19.0",
     "commander": "^2.9.0",
+    "object-assign": "^4.0.1",
+    "playmusic": "jamon/playmusic#18574fa",
     "readline-sync": "^1.2.22",
-    "request-promise": "^1.0.2",
-    "playmusic": "jamon/playmusic#18574fa"
+    "request-promise": "^1.0.2"
   },
   "devDependencies": {
     "jscs": "^2.8.0",
