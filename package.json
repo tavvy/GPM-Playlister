@@ -1,28 +1,37 @@
 {
   "name": "gpm-playlister",
-  "version": "1.0.0",
-  "description": "a node application to generate google music playlists from BBC playlister",
-  "main": ".lib/app.js",
-  "author": "tavvy",
-  "license": "ISC",
-  "devDependencies": {
-    "jscs": "^2.8.0",
-    "jshint": "^2.9.1-rc3"
+  "version": "1.0.0-beta",
+  "description": "A command line Node.js tool that generates a Google Play Music playlist from a BBC Playlister url",
+  "keywords": ["Google Play Music", "Google Music", "BBC Playlister", "BBC Playlist", "Playlist generator", "GPM-Playlister"],
+  "homepage": "https://github.com/tavvy/gpm-playlister",
+  "bugs": "https://github.com/tavvy/gpm-playlister/issues",
+  "author": {
+    "name": "Adam Tavener",
+    "url": "http://www.tavvy.co.uk"
   },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tavvy/gpm-playlister.git"
+  },
+  "license": "ISC",
   "dependencies": {
     "async": "^1.5.2",
     "chalk": "^1.1.1",
     "cheerio": "^0.19.0",
     "commander": "^2.9.0",
-    "playmusic": "^2.1.1",
     "readline-sync": "^1.2.22",
-    "request-promise": "^1.0.2"
+    "request-promise": "^1.0.2",
+    "playmusic": "jamon/playmusic#18574fa"
   },
+  "devDependencies": {
+    "jscs": "^2.8.0",
+    "jshint": "^2.9.1-rc3"
+  },
+  "main": ".lib/app.js",
   "bin": {
     "gpm-playlister": "./bin/gpm-playlister"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "./node_modules/.bin/jshint . && ./node_modules/.bin/jscs ."
   }
 }
