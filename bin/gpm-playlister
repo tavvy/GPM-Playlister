@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 var program = require('commander');
-var pkg = require('../package.json');
+
 var app = require('../lib/app');
 var login = require('../lib/login');
+var pkg = require('../package.json');
 
 /**
  * GENERAL INFO
