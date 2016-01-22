@@ -1,6 +1,6 @@
 {
   "name": "gpm-playlister",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0-beta.5",
   "description": "A command line tool that generates a Google Play Music playlist from a BBC Playlister url",
   "keywords": [
     "Google Play Music",
