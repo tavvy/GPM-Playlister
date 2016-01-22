@@ -65,7 +65,7 @@ Ensure the "Allow less secure apps" setting is "ON" [found here](https://myaccou
 ---
 
 __What does this do?__
-Due to no official GPM API we have to use an [unofficial one](https://github.com/jamon/playmusic#attribution). This will create a mock 'Android' device on your account, which you would be able to see [here](https://security.google.com/settings/security/activity). The mock android id and token is saved locally in: [config/user-data.json](config/user-data.json). *GPM-Playlister* will masquerade as this authorised device. The app __does not__ locally save your username and password.
+Due to no official GPM API we have to use an [unofficial one](https://github.com/jamon/playmusic#attribution). This will create a mock 'Android' device on your account, which you would be able to see [here](https://security.google.com/settings/security/activity). The mock android id and token is saved locally in: `config/auth-token.json`. *GPM-Playlister* will masquerade as this authorised device. The app __does not__ locally save your username and password.
 
 ---
 
@@ -146,7 +146,7 @@ BBC Playlist: [David Bowie: A Life In Music source](http://www.bbc.co.uk/music/p
 - Improve fuzzy matching
 - Allow fuzzy matching of artists (Maximo Park -> Max**ï**mo Park)
 - Logout functionality
-- Custom user-data.json location, so that it may persist with updates to the tool
+- Custom auth-token.json location, so that it may persist with updates to the tool
 - Store final report as log file
 
 ## License
