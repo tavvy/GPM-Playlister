@@ -1,6 +1,6 @@
 
 {
-	"browser": true,
+	"browser": false,
 	"curly": true,
 	"eqeqeq": true,
 	"esnext": true,

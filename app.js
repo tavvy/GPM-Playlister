@@ -1,25 +1,25 @@
 
 'use strict';
 
-var async = require('async');
-var chalk = require('chalk');
-var cheerio = require('cheerio');
-var jsonfile = require('jsonfile');
-var objectAssign = require('object-assign');
-var path = require('path');
-var PlayMusic = require('playmusic');
-var readlineSync = require('readline-sync');
-var rp = require('request-promise');
+const async = require('async');
+const fetch = require('node-fetch');
+const chalk = require('chalk');
+const cheerio = require('cheerio');
+const jsonfile = require('jsonfile');
+const objectAssign = require('object-assign');
+const path = require('path');
+const readlineSync = require('readline-sync');
 
-var authPath = path.join(__dirname, '..', 'config/auth-token.json');
-var fuzzyRegex = require('./fuzzy-regex');
-var reporter = require('./reporter');
-var schemaJSON = require('../config/schema.json');
-var stationsJSON = require('../config/stations.json');
+const fuzzyRegex = require('./lib/fuzzy-regex');
+const reporter = require('./lib/reporter');
+
+const schemaJSON = require('./config/schema.json');
+const stationsJSON = require('./config/stations.json');
+const authPath = path.join(__dirname, './config/auth-token.json');
 
 module.exports = init;
 
-var pm = new PlayMusic();
+const pm = require('./lib/pm');
 
 /**
  * APP ENTRY POINT
@@ -111,49 +111,52 @@ function generate(options) {
 	reporter.info('Generating a playlist from: ' + options.url + '...');
 
 	// init PlayMusic
-	pm.init(options.auth, function(err) {
-		if (err) {
+	pm.init(options.auth)
+		.then(() => {
+
+			// Generate a playlist
+			async.waterfall([
+				function(cbAsync) {
+					// Fetch the Playlister tracklist
+					fetchPlrTracklist(options, function(err, plrTracklist) {
+						if (!err) {
+							reporter.info(
+								'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
+								'\n\nSearching Google Play Music for matching tracks...'
+							);
+						}
+						cbAsync(err, plrTracklist);
+					});
+				},
+				function(plrTracklist, cbAsync) {
+					// Add GPM Store IDs to items in track_list where there is a GPM match
+					fetchGPMStoreIds(plrTracklist.track_list, options, function(err, matchedTracklist) {
+						if (!err) {
+							reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
+							plrTracklist = objectAssign(plrTracklist, matchedTracklist);
+						}
+						cbAsync(err, plrTracklist);
+					});
+				},
+				function(plrTracklist, cbAsync) {
+					// Push the playlist to GPM
+					reporter.info('\nPushing playlist to Google Play Music...');
+					pushGPMPlaylist(plrTracklist, options, function(err, report) {
+						cbAsync(err, report);
+					});
+				}
+			], function(err, report) {
+				if (err) {
+					reporter.exit(err);
+				}
+				// Exit and serve report
+				reporter.finish(report);
+			});
+
+		})
+		.catch(err => {
 			reporter.exit(new Error('There was a problem connecting to Google Play Music' + '\nDetails: ' + err.message));
-		}
-		// Generate a playlist
-		async.waterfall([
-			function(cbAsync) {
-				// Fetch the Playlister tracklist
-				fetchPlrTracklist(options, function(err, plrTracklist) {
-					if (!err) {
-						reporter.info(
-							'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
-							'\n\nSearching Google Play Music for matching tracks...'
-						);
-					}
-					cbAsync(err, plrTracklist);
-				});
-			},
-			function(plrTracklist, cbAsync) {
-				// Add GPM Store IDs to items in track_list where there is a GPM match
-				fetchGPMStoreIds(plrTracklist.track_list, options, function(err, matchedTracklist) {
-					if (!err) {
-						reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
-						plrTracklist = objectAssign(plrTracklist, matchedTracklist);
-					}
-					cbAsync(err, plrTracklist);
-				});
-			},
-			function(plrTracklist, cbAsync) {
-				// Push the playlist to GPM
-				reporter.info('\nPushing playlist to Google Play Music...');
-				pushGPMPlaylist(plrTracklist, options, function(err, report) {
-					cbAsync(err, report);
-				});
-			}
-		], function(err, report) {
-			if (err) {
-				reporter.exit(err);
-			}
-			// Exit and serve report
-			reporter.finish(report);
 		});
-	});
 }
 /**
  * FETCH BBC PLAYLISTER PLAYLIST
@@ -162,20 +165,14 @@ function generate(options) {
  * @callback {err, Object} - autoParsedBody - the result of parsePlrTracklist
  */
 function fetchPlrTracklist(options, callback) {
-	var opts = {
-		uri: options.url,
-		transform: function(htmlString) {
-			return parsePlrTracklist(htmlString, options.url, options.schema);
-		}
-	};
-	rp(opts)
-	.then(function(autoParsedBody) {
-		callback(null, autoParsedBody);
-	})
-	.catch(function(err) {
-		err.message = 'There was an error with the content of: ' + opts.uri + '\nDetails: ' + err.message;
-		callback(err);
-	});
+	fetch(options.url)
+		.then(res => res.text())
+		.then(body => parsePlrTracklist(body, options.url, options.schema))
+		.then(autoParsedBody => callback(null, autoParsedBody))
+		.catch(err => {
+			err.message = 'There was an error with the content of: ' + options.url + '\nDetails: ' + err.message;
+			callback(err);
+		});
 }
 /**
  * PARSE BBC PLAYLISTER BODY HTML
@@ -230,19 +227,24 @@ function fetchGPMStoreIds(trackList, options, callback) {
 	async.forEachOf(response.track_list, function(track, i, cbAsync) {
 
 		// search GPM for "<artist> <title>", max 5 results
-		pm.search(track.artist + ' ' + track.title, 5, function(err, data) {
-			if (!err && data.entries) {
-				matchResult(data.entries, track, options, function(match) {
-					if (match.storeId) {
-						response.matches++;
-						track.gpmStoreId = match.storeId;
-					}
-				});
-			} else {
+		pm.search(track.artist + ' ' + track.title, 5)
+			.then(data => {
+				if (data.entries) {
+					matchResult(data.entries, track, options, function(match) {
+						if (match.storeId) {
+							response.matches++;
+							track.gpmStoreId = match.storeId;
+						}
+					});
+				} else {
+					reporter.match(null, track);
+				}
+				cbAsync(null);
+			})
+			.catch(err => {
 				reporter.match(null, track);
-			}
-			cbAsync(err);
-		});
+				cbAsync(err);
+			});
 
 	}, function(err) {
 		if (err) {
@@ -417,12 +419,14 @@ function pushGPMPlaylist(plrTracklist, options, callback) {
 			});
 		},
 		function(cbAsync) {
-			clearGPMPlaylistEntries(response.playlist_id, function(err, result) {
-				if (!err && result) {
+
+			return clearGPMPlaylistEntries(response.playlist_id)
+				.then(result => {
 					response = objectAssign(response, result);
-				}
-				cbAsync(err);
-			});
+					cbAsync(null);
+				})
+				.catch(err => cbAsync(err));
+
 		},
 		function(cbAsync) {
 			appendGPMPlaylist(response.playlist_id, response.new_entries, options, function(err, result) {
@@ -482,12 +486,7 @@ function getGPMPlaylistId(name, options, callback) {
 
 	} else {
 
-		pm.getPlayLists(function(err, playlists) {
-			if (err) {
-				err.message = 'There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message;
-				return callback(err);
-			}
-
+		pm.getPlayLists().then(playlists => {
 			// Replace an existing playlist
 			if (playlists && playlists.data && playlists.data.items) {
 				playlists.data.items.forEach(function(item) {
@@ -511,6 +510,10 @@ function getGPMPlaylistId(name, options, callback) {
 				callback(err, response);
 			});
 
+		})
+		.catch(err => {
+			err.message = 'There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message;
+			return callback(err);
 		});
 	}
 
@@ -521,38 +524,42 @@ function getGPMPlaylistId(name, options, callback) {
  * @param {String} playlistId - the id of the GPM playlist
  * @callback {err, Object} - response - contains removed entry ids and how many were cut
  */
-function clearGPMPlaylistEntries(playlistId, callback) {
+function clearGPMPlaylistEntries(playlistId) {
 	var response = {
 		cut: null,
 		removed_entries: []
 	};
 
-	pm.getPlayListEntries(function(err, result) {
-		if (err) {
-			err.message = 'There was a problem emptying the existing Google Play Music Playlist' + '\nDetails: ' + err.message;
-			return callback(err);
-		}
+	return pm.getPlayListEntries()
+		.then(result => {
 
-		if (result && result.data && result.data.items) {
-			result.data.items.forEach(function(item) {
-				if (item.playlistId === playlistId) {
-					response.removed_entries.push(item.id);
-				}
-			});
-		}
-
-		if (response.removed_entries.length === 0) {
-			return callback(null, response);
-		}
-
-		cutGPMPlaylistEntry(response.removed_entries, function(err, result) {
-			if (!err) {
-				response = objectAssign(response, result);
+			if (result && result.data && result.data.items) {
+				result.data.items.forEach(function(item) {
+					if (item.playlistId === playlistId) {
+						response.removed_entries.push(item.id);
+					}
+				});
 			}
-			callback(err, response);
-		});
 
-	});
+			if (response.removed_entries.length === 0) {
+				return response;
+			}
+
+			return cutGPMPlaylistEntry(response.removed_entries)
+				.then(result => {
+					response = objectAssign(response, result);
+					return response;
+				})
+				.catch(err => {
+					throw err;
+				});
+
+		})
+		.then(res => res)
+		.catch(err => {
+			err.message = 'There was a problem emptying the existing Google Play Music Playlist' + '\nDetails: ' + err.message;
+			throw err;
+		});
 
 }
 /**
@@ -567,20 +574,21 @@ function createGPMPlaylist(name, callback) {
 		playlist_url: null
 	};
 
-	pm.addPlayList(name, function(err, response) {
-		if (err) {
+
+	pm.addPlayList(name)
+		.then(response => {
+			// map the response from: {mutate_response: [{id:val}]}
+			result.playlist_id = response.mutate_response[0].id || null;
+
+			getPlaylistUrl(result.playlist_id, function(url) {
+				result.playlist_url = url;
+				callback(null, result);
+			});
+		})
+		.catch(err => {
 			err.message = 'There was a problem creating a Google Play Music Playlist' + '\nDetails: ' + err.message;
 			return callback(err);
-		}
-		// map the response from: {mutate_response: [{id:val}]}
-		result.playlist_id = response.mutate_response[0].id || null;
-
-		getPlaylistUrl(result.playlist_id, function(url) {
-			result.playlist_url = url;
-			callback(null, result);
 		});
-
-	});
 }
 /**
  * DELETE GPM PLAYLIST ENTRIES BY ID
@@ -588,16 +596,15 @@ function createGPMPlaylist(name, callback) {
  * @param {Array} playlistEntries - GPM playlist entry ids
  * @callback {err, Object} - response - how many entries were deleted
  */
-function cutGPMPlaylistEntry(playlistEntries, callback) {
-	var response = {
-		cut: playlistEntries.length
-	};
-	pm.removePlayListEntry(playlistEntries, function(err) {
-		if (err) {
-			err.message = 'There was a problem removing tracks from a Google Play Music playlist' + '\nDetails: ' + err.message;
-		}
-		callback(err, response);
-	});
+function cutGPMPlaylistEntry(playlistEntries) {
+	const response = {cut: playlistEntries.length};
+
+	return pm.removePlayListEntry(playlistEntries)
+			.then(() => response)
+			.catch(err => {
+				err.message = 'There was a problem removing tracks from a Google Play Music playlist' + '\nDetails: ' + err.message;
+				throw err;
+			});
 }
 /**
  * ADD TRACKS TO A GPM PLAYLIST
@@ -611,12 +618,13 @@ function appendGPMPlaylist(playlistId, storeIdList, options, callback) {
 	var result = {
 		pushed: storeIdList.length
 	};
-	pm.addTrackToPlayList(storeIdList, playlistId, function(err) {
-		if (err) {
+
+	pm.addTrackToPlayList(storeIdList, playlistId)
+		.then(() => callback(null, result))
+		.catch(err => {
 			err.message = 'There was a problem adding tracks to Google Play Music playlist' + '\nDetails: ' + err.message;
-		}
-		callback(err, result);
-	});
+			callback(err, null);
+		});
 }
 /**
  * GET A GPM PLAYLIST URL
@@ -626,12 +634,8 @@ function appendGPMPlaylist(playlistId, storeIdList, options, callback) {
  */
 function getPlaylistUrl(playlistId, callback) {
 	var url = null;
-	pm.getPlayLists(function(err, playlists) {
-		if (err) {
-			// warn instead of err
-			reporter.warn('There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message);
-			return callback(url);
-		}
+
+	pm.getPlayLists().then(playlists => {
 		// find match
 		if (playlists && playlists.data && playlists.data.items) {
 			playlists.data.items.forEach(function(item) {
@@ -641,6 +645,10 @@ function getPlaylistUrl(playlistId, callback) {
 			});
 		}
 		callback(url);
+	})
+	.catch(err => {
+		reporter.warn('There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message);
+		return callback(url);
 	});
 }
 /**
@@ -657,14 +665,14 @@ function updateGPMPlaylistDescription(playlistId, description, callback) {
 	var updates = {
 		description: description
 	};
-	pm.updatePlayListMeta(playlistId, updates, function(err) {
-		if (err) {
-			// warn instead of err
+
+	pm.updatePlayListMeta(playlistId, updates)
+		.then(() => callback(response))
+		.catch(err => {
 			reporter.warn('Could not update the Google Play Music playlist description' + '\nDetails: ' + err.message);
 			response.playlist_description = null;
-		}
-		callback(response);
-	});
+			callback(response);
+		});
 }
 /**
  * MATCH AND VALIDATE A GPM PLAYLIST

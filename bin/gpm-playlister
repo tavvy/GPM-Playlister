@@ -2,7 +2,7 @@
 
 var program = require('commander');
 
-var app = require('../lib/app');
+var app = require('../app');
 var login = require('../lib/login');
 var pkg = require('../package.json');
 
