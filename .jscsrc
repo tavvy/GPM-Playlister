@@ -50,7 +50,7 @@
 	"requireDotNotation": true,
 	"requireLineBreakAfterVariableAssignment": true,
 	"requireLineFeedAtFileEnd": true,
-	"requireObjectKeysOnNewLine": true,
+	"requireObjectKeysOnNewLine": false,
 	"requireParenthesesAroundIIFE": true,
 	"requireSemicolons": true,
 	"requireSpaceAfterBinaryOperators": true,

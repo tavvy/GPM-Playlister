@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-var program = require('commander');
+const program = require('commander');
 
-var app = require('../app');
-var login = require('../lib/login');
-var pkg = require('../package.json');
+const app = require('../app');
+const login = require('../lib/login');
+const pkg = require('../package.json');
 
 /**
  * GENERAL INFO
@@ -22,7 +22,7 @@ program
 	.option('-g, --guided', 'Guided mode: ask for help when finding matching search results')
 	.option('-r, --replace', 'Replace existing GPM playlist if there is a match')
 	.action(function(url, options) {
-		var opts = mapGenerateOpts(url, options);
+		const opts = mapGenerateOpts(url, options);
 		app(opts);
 	})
 	.description('Generate a playlist')
