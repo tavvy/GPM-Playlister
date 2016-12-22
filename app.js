@@ -1,7 +1,6 @@
 
 'use strict';
 
-const async = require('async');
 const fetch = require('node-fetch');
 const chalk = require('chalk');
 const cheerio = require('cheerio');
@@ -32,7 +31,7 @@ module.exports = init;
  */
 function init(cliArgs) {
 	// set up generate options
-	var options = {
+	const options = {
 		url: cliArgs.station ? presetStations[cliArgs.station] : cliArgs.url,
 		schema: cliArgs.station ? schema.bbc_station : schema.bbc_playlister,
 		guided: cliArgs.guided || false,
@@ -48,10 +47,8 @@ function init(cliArgs) {
 	// check auth file
 	readJson(authPath)
 		.then(data => checkAuth(data))
-		.then(res => {
-			options.auth = res;
-			return generate(options);
-		})
+		.then(res => options.auth = res)
+		.then(() => generate(options))
 		.catch(err => {
 			reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
 		});
@@ -82,11 +79,7 @@ function checkAuth(authFileData) {
  * @return {Boolean} - isValid - if url is a valid bbc playlister url
  */
 function checkUrl(url) {
-	var isValid = false;
-	if (url && url.search(/bbc\.co\.uk/ig) !== -1) {
-		isValid = true;
-	}
-	return isValid;
+	return url && url.search(/bbc\.co\.uk/ig) !== -1;
 }
 /**
  * GENERATE
@@ -106,48 +99,26 @@ function generate(options) {
 
 	// init PlayMusic
 	PM.init(options.auth)
-		.then(() => {
-
-			// Generate a playlist
-			async.waterfall([
-				function(cbAsync) {
-					// Fetch the Playlister tracklist
-					fetchPlrTracklist(options, function(err, plrTracklist) {
-						if (!err) {
-							reporter.info(
-								'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
-								'\n\nSearching Google Play Music for matching tracks...'
-							);
-						}
-						cbAsync(err, plrTracklist);
-					});
-				},
-				function(plrTracklist, cbAsync) {
-					// Add GPM Store IDs to items in track_list where there is a GPM match
-					fetchGPMStoreIds(plrTracklist.track_list, options, function(err, matchedTracklist) {
-						if (!err) {
-							reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
-							plrTracklist = Object.assign(plrTracklist, matchedTracklist);
-						}
-						cbAsync(err, plrTracklist);
-					});
-				},
-				function(plrTracklist, cbAsync) {
-					// Push the playlist to GPM
-					reporter.info('\nPushing playlist to Google Play Music...');
-					pushGPMPlaylist(plrTracklist, options, function(err, report) {
-						cbAsync(err, report);
-					});
-				}
-			], function(err, report) {
-				if (err) {
-					reporter.exit(err);
-				}
-				// Exit and serve report
-				reporter.finish(report);
-			});
-
+		.then(() => fetchPlrTracklist(options))
+		.then(plrTracklist => {
+			reporter.info(
+				'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
+				'\n\nSearching Google Play Music for matching tracks...'
+			);
+			return plrTracklist;
 		})
+		.then(plrTracklist => {
+			return fetchGPMStoreIds(plrTracklist.track_list, options)
+				.then(matchedTracklist => {
+					reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
+					return Object.assign(plrTracklist, matchedTracklist);
+				});
+		})
+		.then(matchedPlrTracklist => {
+			reporter.info('\nPushing playlist to Google Play Music...');
+			return pushGPMPlaylist(matchedPlrTracklist, options);
+		})
+		.then(report => reporter.finish(report))
 		.catch(err => {
 			reporter.exit(new Error('There was a problem connecting to Google Play Music' + '\nDetails: ' + err.message));
 		});
@@ -156,16 +127,14 @@ function generate(options) {
  * FETCH BBC PLAYLISTER PLAYLIST
  * Grabs html body from given url and performs a transformation on the result
  * @param {Object} options - app options
- * @callback {err, Object} - autoParsedBody - the result of parsePlrTracklist
  */
-function fetchPlrTracklist(options, callback) {
-	fetch(options.url)
+function fetchPlrTracklist(options) {
+	return fetch(options.url)
 		.then(res => res.text())
 		.then(body => parsePlrTracklist(body, options.url, options.schema))
-		.then(autoParsedBody => callback(null, autoParsedBody))
 		.catch(err => {
 			err.message = 'There was an error with the content of: ' + options.url + '\nDetails: ' + err.message;
-			callback(err);
+			throw err;
 		});
 }
 /**
@@ -176,33 +145,32 @@ function fetchPlrTracklist(options, callback) {
  * @return {Object} - plrTracklist - contains the playlist name, description and array of tracks containing title and artists
  */
 function parsePlrTracklist(htmlString, sourceUrl, schema) {
-	var $ = cheerio.load(htmlString);
-	var selector = schema;
-	var plrTracklist = {
-		playlist_name: null,
-		playlist_description: 'source: ' + sourceUrl + ' (generated by http://www.github.com/tavvy/GPM-Playlister)',
+	const $ = cheerio.load(htmlString);
+	const selector = schema;
+
+	let res = {
+		playlist_name: $(selector.playlist_name_selector).text().trim() || null,
+		playlist_description: `source: ${sourceUrl} (generated by http://www.github.com/tavvy/GPM-Playlister)`,
 		playlist_source: sourceUrl,
 		track_list: []
 	};
 
-	plrTracklist.playlist_name = $(selector.playlist_name_selector).text().trim() || null;
-
 	if (selector.playlist_desc_selector === 'meta') {
-		plrTracklist.playlist_description = ($('meta[name=description]').attr('content').trim() || null) + ' | ' + plrTracklist.playlist_description;
+		res.playlist_description = ($('meta[name=description]').attr('content').trim() || null) + ' | ' + res.playlist_description;
 	} else {
-		plrTracklist.playlist_description = ($(selector.playlist_desc_selector).text().trim() || null) + ' | ' + plrTracklist.playlist_description;
+		res.playlist_description = ($(selector.playlist_desc_selector).text().trim() || null) + ' | ' + res.playlist_description;
 	}
 
 	$(selector.track_selector, selector.tracklist_selector).each(function(i, el) {
-		var track_artist = $(selector.artist_selector, el).text().trim() || $(selector.alt_artist_selector, el).text().trim() || null;
-		var track_title = $(selector.title_selector, el).text().trim() || null;
-		plrTracklist.track_list.push({
+		const track_artist = $(selector.artist_selector, el).text().trim() || $(selector.alt_artist_selector, el).text().trim() || null;
+		const track_title = $(selector.title_selector, el).text().trim() || null;
+		res.track_list.push({
 			title: track_title,
 			artist: track_artist
 		});
 	});
 
-	return plrTracklist;
+	return res;
 }
 /**
  * CREATE GPM STORE ID ARRAY
@@ -211,68 +179,75 @@ function parsePlrTracklist(htmlString, sourceUrl, schema) {
  * @param {Object} options - app options
  * @callback {err, Array} - storeIds - an array of GPM-Store-IDs
  */
-function fetchGPMStoreIds(trackList, options, callback) {
+function fetchGPMStoreIds(trackList, options) {
 	var response = {
 		track_list: trackList,
 		matches: 0
 	};
 
-	// for each song in the trackList
-	async.forEachOf(response.track_list, function(track, i, cbAsync) {
-
-		// search GPM for "<artist> <title>", max 5 results
-		PM.search(track.artist + ' ' + track.title, 5)
-			.then(data => {
-				if (data.entries) {
-					matchResult(data.entries, track, options, function(match) {
-						if (match.storeId) {
-							response.matches++;
-							track.gpmStoreId = match.storeId;
-						}
-					});
-				} else {
-					reporter.match(null, track);
+	const searches = response.track_list.map(track => {
+		return PM.search(`${track.artist} ${track.title}`, 5)
+			.then(results => {
+				if (results.entries) {
+					track.results = results.entries;
 				}
-				cbAsync(null);
-			})
-			.catch(err => {
-				reporter.match(null, track);
-				cbAsync(err);
+				return track;
 			});
-
-	}, function(err) {
-		if (err) {
-			err.message = 'There was a problem searching Google Play Music' + '\nDetails: ' + err.message;
-		}
-		callback(err, response);
 	});
+
+	return Promise.all(searches)
+			.then(tracks => {
+				const matches = tracks.map(t => {
+					return matchTrackResult(t, options)
+						.then(match => {
+							if (match.storeId) {
+								response.matches++;
+								t.gpmStoreId = match.storeId;
+							} else {
+								reporter.match(null, t);
+							}
+							return t;
+						});
+				});
+				return Promise.all(matches);
+			})
+			.then(res => {
+				response.track_list = res;
+				return response;
+			});
 }
 /**
  * FIND A MATCHING TRACK IN A LIST OF RESULTS
  * Find a matching track in a list of GPM search results
- * @param {Array} results - an array of GPM search results containing track title and artists
- * @param {Object} query - contains the title and artist of the track to find
+ * @param {Object} track - contains the title and artist of the track to find
+ * @param {Array} track.results - an array of GPM search results containing track title and artists
  * @param {Object} options - app options
- * @callback {Object} - match - contains match data, type and its GPM-Store-ID
+ * @resolve {Object} - match - contains match data, type and its GPM-Store-ID
  */
-function matchResult(results, query, options, callback) {
-	var match = {
+
+function matchTrackResult(track, options) {
+
+	let match = {
 		data: null,
 		matchType: 0,
-		storeId: null
+		storeId: 0
 	};
 
-	// try and find a matching result
-	results.forEach(function(item) {
-		// if its a valid song and we havnt found a match yet
-		if (!match.data && validateGPMSongResult(item, query)) {
+	if (!track.results) {
+		return Promise.resolve(track);
+	}
 
-			if (item.track.title.toUpperCase() === query.title.toUpperCase()) {
+	// try and find a matching result
+	track.results.forEach(function(item) {
+		// if its a valid song and we havnt found a match yet
+		if (!match.data && validateGPMSongResult(item, track)) {
+
+			if (item.track.title.toUpperCase() === track.title.toUpperCase()) {
 				// exact title match
 				match.data = item;
 				match.matchType = 1;
 				match.storeId = item.track.storeId;
-			} else if (fuzzyMatchTitle(item, query)) {
+			} else if (fuzzyMatchTitle(item, track)) {
 				// fuzzy title match
 				match.data = item;
 				match.matchType = 2;
@@ -284,7 +259,7 @@ function matchResult(results, query, options, callback) {
 
 	// ask user for help
 	if (!match.data && options.guided) {
-		userMatch(results, query, function(item) {
+		userMatch(track.results, track, function(item) {
 			if (item) {
 				// user match
 				match.data = item;
@@ -295,9 +270,10 @@ function matchResult(results, query, options, callback) {
 	}
 
 	// report the match
-	reporter.match(match.matchType, query, match.data);
+	reporter.match(match.matchType, track, match.data);
 
-	callback(match);
+	return Promise.resolve(match);
+
 }
 /**
  * VALIDATE GPM SONG
@@ -326,11 +302,7 @@ function validateGPMSongResult(result, query) {
  * @return {Boolean} - isMatch - if title is a fuzzy match
  */
 function fuzzyMatchTitle(result, query) {
-	var isMatch = false;
-	if (fuzzTitle(result.track.title) === fuzzTitle(query.title)) {
-		isMatch = true;
-	}
-	return isMatch;
+	return fuzzTitle(result.track.title) === fuzzTitle(query.title);
 }
 /**
  * FUZZ-IFY A TITLE
@@ -358,6 +330,7 @@ function fuzzTitle(title) {
 function userMatch(results, query, callback) {
 	var mappedResults = {};
 	var match = null;
+
 
 	results.forEach(function(item) {
 		if (validateGPMSongResult(item)) {
@@ -390,7 +363,7 @@ function userMatch(results, query, callback) {
  * @param {Object} options - app options
  * @callback {err, Object} - response - contains pushed playlist data
  */
-function pushGPMPlaylist(plrTracklist, options, callback) {
+function pushGPMPlaylist(plrTracklist, options) {
 	var response = {
 		playlist_id: null,
 		playlist_url: null,
@@ -403,58 +376,33 @@ function pushGPMPlaylist(plrTracklist, options, callback) {
 
 	response = Object.assign(plrTracklist, response);
 
-	async.waterfall([
-		function(cbAsync) {
-			getGPMPlaylistId(response.playlist_name, options, function(err, result) {
-				if (!err && result) {
-					response = Object.assign(response, result);
-				}
-				cbAsync(err);
-			});
-		},
-		function(cbAsync) {
-
-			return clearGPMPlaylistEntries(response.playlist_id)
-				.then(result => {
-					response = Object.assign(response, result);
-					cbAsync(null);
-				})
-				.catch(err => cbAsync(err));
-
-		},
-		function(cbAsync) {
-			appendGPMPlaylist(response.playlist_id, response.new_entries, options, function(err, result) {
-				if (!err && result) {
-					response = Object.assign(response, result);
-				}
-				cbAsync(err);
-			});
-		},
-		function(cbAsync) {
-			updateGPMPlaylistDescription(response.playlist_id, response.playlist_description, function(result) {
-				response = Object.assign(response, result);
-				cbAsync();
-			});
-		}
-	], function(err) {
-		callback(err, response);
-	});
+	return getGPMPlaylistId(response.playlist_name, options)
+		.then(res => {
+			response = Object.assign(response, res);
+			return response;
+		})
+		.then(response => clearGPMPlaylistEntries(response.playlist_id))
+		.then(res => {
+			response = Object.assign(response, res);
+			return response;
+		})
+		.then(response => appendGPMPlaylist(response.playlist_id, response.new_entries))
+		.then(res => {
+			response = Object.assign(response, res);
+			return response;
+		})
+		.then(response => updateGPMPlaylistDescription(response.playlist_id, response.playlist_description))
+		.then(res => Object.assign(response, res));
 
 }
 /**
  * MAP GPM-STORE-IDS
  * Will first filter and then store tracklist entries with a GPM-Store-ID
- * @param {Array} trackList - an array of objects containing tracks title, artist and optional GPM-Store-ID
+ * @param {Array} tl (trackList) - an array of objects containing tracks title, artist and optional GPM-Store-ID
  * @returns {Array} storeIdList - an array of GPM-Store-IDS
  */
-function mapStoreIds(trackList) {
-	var storeIdList = [];
-	storeIdList = trackList.filter(function(el) {
-		return el.gpmStoreId ? true : false;
-	}).map(function(el) {
-		return el.gpmStoreId;
-	});
-	return storeIdList;
+function mapStoreIds(tl) {
+	return tl.filter(t => t.gpmStoreId).map(t => t.gpmStoreId);
 }
 /**
  * GET GPM PLAYLIST ID
@@ -463,24 +411,23 @@ function mapStoreIds(trackList) {
  * @param {Object} options - app options
  * @callback {err, Object} - response - contains playlist id, url and type
  */
-function getGPMPlaylistId(name, options, callback) {
+function getGPMPlaylistId(name, options) {
 	var response = {
 		playlist_id: null,
 		playlist_url: null,
 		type: null
 	};
 
+
 	if (!options.replaceExisting) {
 		// create new playlist
 		response.type = 0;
-		createGPMPlaylist(name, function(err, result) {
-			response = Object.assign(response, result);
-			return callback(err, response);
-		});
+		return createGPMPlaylist(name)
+			.then(res => Object.assign(response, res));
 
 	} else {
 
-		PM.getPlayLists().then(playlists => {
+		return PM.getPlayLists().then(playlists => {
 			// Replace an existing playlist
 			if (playlists && playlists.data && playlists.data.items) {
 				playlists.data.items.forEach(function(item) {
@@ -494,20 +441,18 @@ function getGPMPlaylistId(name, options, callback) {
 
 			if (response.playlist_id) {
 				response.type = 1;
-				return callback(null, response);
+				return response;
 			}
 
 			// Nothing to replace, create a new playlist
 			response.type = 2;
-			createGPMPlaylist(name, function(err, result) {
-				response = Object.assign(response, result);
-				callback(err, response);
-			});
+			return createGPMPlaylist(name)
+				.then(res => Object.assign(response, res));
 
 		})
 		.catch(err => {
 			err.message = 'There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message;
-			return callback(err);
+			throw err;
 		});
 	}
 
@@ -562,26 +507,27 @@ function clearGPMPlaylistEntries(playlistId) {
  * @param {String} name - the name of the GPM playlist to create
  * @callback {err, Object} - result - contains new playlist id, url
  */
-function createGPMPlaylist(name, callback) {
+function createGPMPlaylist(name) {
 	var result = {
 		playlist_id: null,
 		playlist_url: null
 	};
 
 
-	PM.addPlayList(name)
+	return PM.addPlayList(name)
 		.then(response => {
 			// map the response from: {mutate_response: [{id:val}]}
 			result.playlist_id = response.mutate_response[0].id || null;
 
-			getPlaylistUrl(result.playlist_id, function(url) {
-				result.playlist_url = url;
-				callback(null, result);
-			});
+			return getPlaylistUrl(result.playlist_id)
+				.then(url => {
+					result.playlist_url = url;
+					return result;
+				});
 		})
 		.catch(err => {
 			err.message = 'There was a problem creating a Google Play Music Playlist' + '\nDetails: ' + err.message;
-			return callback(err);
+			throw err;
 		});
 }
 /**
@@ -608,16 +554,16 @@ function cutGPMPlaylistEntry(playlistEntries) {
  * @param {Object} options - app options
  * @callback {err, Object} - response - how many tracks were added
  */
-function appendGPMPlaylist(playlistId, storeIdList, options, callback) {
+function appendGPMPlaylist(playlistId, storeIdList) {
 	var result = {
 		pushed: storeIdList.length
 	};
 
-	PM.addTrackToPlayList(storeIdList, playlistId)
-		.then(() => callback(null, result))
+	return PM.addTrackToPlayList(storeIdList, playlistId)
+		.then(() => result)
 		.catch(err => {
 			err.message = 'There was a problem adding tracks to Google Play Music playlist' + '\nDetails: ' + err.message;
-			callback(err, null);
+			throw err;
 		});
 }
 /**
@@ -626,10 +572,10 @@ function appendGPMPlaylist(playlistId, storeIdList, options, callback) {
  * @param {String} playlistId - the ID of the GPM playlist
  * @callback {String} - result - the url or null
  */
-function getPlaylistUrl(playlistId, callback) {
+function getPlaylistUrl(playlistId) {
 	var url = null;
 
-	PM.getPlayLists().then(playlists => {
+	return PM.getPlayLists().then(playlists => {
 		// find match
 		if (playlists && playlists.data && playlists.data.items) {
 			playlists.data.items.forEach(function(item) {
@@ -638,11 +584,11 @@ function getPlaylistUrl(playlistId, callback) {
 				}
 			});
 		}
-		callback(url);
+		return url;
 	})
 	.catch(err => {
 		reporter.warn('There was a problem finding Google Play Music Playlists' + '\nDetails: ' + err.message);
-		return callback(url);
+		return url;
 	});
 }
 /**
@@ -652,7 +598,7 @@ function getPlaylistUrl(playlistId, callback) {
  * @param {String} - description - the description
  * @callback {Object} - response - contains the playlist description
  */
-function updateGPMPlaylistDescription(playlistId, description, callback) {
+function updateGPMPlaylistDescription(playlistId, description) {
 	var response = {
 		playlist_description: description
 	};
@@ -660,12 +606,12 @@ function updateGPMPlaylistDescription(playlistId, description, callback) {
 		description: description
 	};
 
-	PM.updatePlayListMeta(playlistId, updates)
-		.then(() => callback(response))
+	return PM.updatePlayListMeta(playlistId, updates)
+		.then(() => response)
 		.catch(err => {
 			reporter.warn('Could not update the Google Play Music playlist description' + '\nDetails: ' + err.message);
 			response.playlist_description = null;
-			callback(response);
+			return response;
 		});
 }
 /**
