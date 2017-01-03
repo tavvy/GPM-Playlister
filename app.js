@@ -11,6 +11,7 @@ const readJson = require('./lib/read-json');
 const fuzzyRegex = require('./lib/fuzzy-regex');
 const reporter = require('./lib/reporter');
 const PM = require('./lib/pm');
+const utils = require('./lib/utils');
 
 const schema = require('./config/schema');
 const presetStations = require('./config/stations');
@@ -40,7 +41,7 @@ function init(cliArgs) {
 	};
 
 	// check url
-	if (!checkUrl(options.url)) {
+	if (!utils.isPlaylisterUrl(options.url)) {
 		return reporter.exit(new Error('Not a valid BBC Playlist url'));
 	}
 
@@ -72,14 +73,6 @@ function checkAuth(authFileData) {
 		// invalid credentials
 		return reject(new Error('Invalid auth-token'));
 	});
-}
-/**
- * CHECK URL IS VALID
- * @param {String} - url - the url to check
- * @return {Boolean} - isValid - if url is a valid bbc playlister url
- */
-function checkUrl(url) {
-	return url && url.search(/bbc\.co\.uk/ig) !== -1;
 }
 /**
  * GENERATE
