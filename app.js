@@ -425,7 +425,7 @@ function createGPMPlaylist(name) {
 		.then(response => response.mutate_response[0].id)
 		.then(id => {
 			return getPlaylistUrl(id)
-				.then(url => ({playlist_id: id, playlist_url: url}))
+				.then(({shareToken }) => ({playlist_id: id, playlist_url: shareToken}))
 		})
 		.catch(err => {
 			err.message = 'There was a problem creating a Google Play Music Playlist' + '\nDetails: ' + err.message;
@@ -474,8 +474,7 @@ function getPlaylistUrl(playlistId) {
 			// find match
 			if (playlists && playlists.data && playlists.data.items) {
 				return playlists.data.items
-					.find(item => item.id === playlistId)
-					.then(match => match.shareToken);
+					.find(item => item.id === playlistId);
 			}
 		})
 		.catch(err => {
