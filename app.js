@@ -42,8 +42,10 @@ function init(cliArgs) {
 	// check auth file
 	utils.readJson(config.authPath)
 		.then(authData => utils.isValidAuth(authData))
-		.then(res => options.auth = res)
-		.then(() => generate(options))
+		.then(res => {
+			options.auth = res;
+			return generate(options);
+		})
 		.catch(err => {
 			reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
 		});
@@ -66,13 +68,15 @@ function generate(options) {
 
 	// init PlayMusic
 	PM.init(options.auth)
-		.then(() => fetchPlrTracklist(options))
-		.then(plrTracklist => {
-			reporter.info(
-				'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
-				'\n\nSearching Google Play Music for matching tracks...'
-			);
-			return plrTracklist;
+		.then(() => {
+			return fetchPlrTracklist(options)
+				.then(plrTracklist => {
+					reporter.info(
+						'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
+						'\n\nSearching Google Play Music for matching tracks...'
+					);
+					return plrTracklist;
+				});
 		})
 		.then(plrTracklist => {
 			return fetchGPMStoreIds(plrTracklist.track_list, options)
@@ -85,13 +89,10 @@ function generate(options) {
 			reporter.info('\nPushing playlist to Google Play Music...');
 			return pushGPMPlaylist(matchedPlrTracklist, options);
 		})
-		.then(report => reporter.finish(report))
+		.then(reporter.finish)
 		.catch(err => {
 			reporter.exit(new Error('There was a problem connecting to Google Play Music' + '\nDetails: ' + err.message));
 		});
-
-
-
 
 }
 /**
@@ -362,29 +363,6 @@ function getGPMPlaylistId(name, options) {
 
 }
 
-
-function recursiveSearch (currentResults, nextPageToken) {
-	// console.log(currentResults)
-	let results = currentResults && currentResults.length > 0 ? currentResults : [];
-	return PM.getPlayListEntries({ limit: 10000, nextPageToken })
-		.then(res => {
-			if (res && res.data && res.data.items) {
-				results = results.concat(res.data.items);
-				if (res.nextPageToken) {
-					return recursiveSearch(results, res.nextPageToken)
-				} else {
-					return results;
-				}
-			} else {
-				if (results.length > 0) {
-					return results;
-				} else {
-					throw new Error('recursive search got no results');
-				}
-			}
-		})
-}
-
 /**
  * CLEAR GPM PLAYLIST ENTRIES
  * will remove all entries of a given GPM playlist id
@@ -392,22 +370,18 @@ function recursiveSearch (currentResults, nextPageToken) {
  * @callback {err, Object} - response - contains removed entry ids and how many were cut
  */
 function clearGPMPlaylistEntries(playlistId) {
-	return recursiveSearch()
-	// return PM.getPlayListEntries({limit: 10000})
-		.then(items => 
+	return PM.getPlayListEntriesRecursive()
+		.then(items =>
 			items
 				.filter(item => item.playlistId === playlistId)
 				.map(item => item.id)
 		)
 		.then(items => {
-			console.log(items)
-			console.log('cut entries')
-			if (items.length === 0) {
-				return { cut: 'none', removed_entries: [] };
-			} else {
+			if (items.length > 0) {
 				return cutGPMPlaylistEntry(items)
-					.then(result => ({cut: result.cut, removed_entries: items}));
+					.then(() => ({cut: items.length, removed_entries: items}));
 			}
+			return { cut: 'none', removed_entries: [] };
 		})
 		.catch(err => {
 			err.message = 'There was a problem emptying the existing Google Play Music Playlist' + '\nDetails: ' + err.message;
@@ -423,10 +397,10 @@ function clearGPMPlaylistEntries(playlistId) {
 function createGPMPlaylist(name) {
 	return PM.addPlayList(name)
 		.then(response => response.mutate_response[0].id)
-		.then(id => {
-			return getPlaylistUrl(id)
+		.then(id =>
+			getPlaylistUrl(id)
 				.then(({shareToken }) => ({playlist_id: id, playlist_url: shareToken}))
-		})
+		)
 		.catch(err => {
 			err.message = 'There was a problem creating a Google Play Music Playlist' + '\nDetails: ' + err.message;
 			throw err;
@@ -439,9 +413,7 @@ function createGPMPlaylist(name) {
  * @callback {err, Object} - response - how many entries were deleted
  */
 function cutGPMPlaylistEntry(playlistEntries) {
-	console.log('cut entries')
 	return PM.removePlayListEntry(playlistEntries)
-		.then(() => ({cut: playlistEntries.length}))
 		.catch(err => {
 			err.message = 'There was a problem removing tracks from a Google Play Music playlist' + '\nDetails: ' + err.message;
 			throw err;
@@ -473,8 +445,7 @@ function getPlaylistUrl(playlistId) {
 	return PM.getPlayLists().then(playlists => {
 			// find match
 			if (playlists && playlists.data && playlists.data.items) {
-				return playlists.data.items
-					.find(item => item.id === playlistId);
+				return playlists.data.items.find(item => item.id === playlistId);
 			}
 		})
 		.catch(err => {
