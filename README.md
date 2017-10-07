@@ -19,7 +19,7 @@ gpm-playlister generate -s radioscotland
 - [License](#license)
 
 ## Requirements
-- [Node.js](https://nodejs.org) 6+
+- [Node.js](https://nodejs.org) 8+
 - A Google Play Music account with these [permissions](https://github.com/jamon/playmusic#authentication)
 
 ## Installation

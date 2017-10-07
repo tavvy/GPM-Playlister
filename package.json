@@ -22,7 +22,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=0.12.0"
+    "node": ">=8.1.2"
   },
   "dependencies": {
     "chalk": "^1.1.3",
