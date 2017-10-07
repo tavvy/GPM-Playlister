@@ -29,19 +29,26 @@
     "cheerio": "^0.22.0",
     "commander": "^2.9.0",
     "jsonfile": "^2.4.0",
+    "lodash.get": "^4.4.2",
     "node-fetch": "^1.6.3",
     "playmusic": "^2.2.0",
     "readline-sync": "^1.4.5"
   },
   "devDependencies": {
+    "chai": "^3.5.0",
     "jscs": "^3.0.7",
-    "jshint": "^2.9.4"
+    "jshint": "^2.9.4",
+    "mocha": "^3.3.0",
+    "nock": "^9.0.13",
+    "proxyquire": "^1.7.11",
+    "sinon": "^2.2.0"
   },
   "main": "./app.js",
   "bin": {
     "gpm-playlister": "./bin/gpm-playlister"
   },
   "scripts": {
-    "lint": "./node_modules/.bin/jshint . && ./node_modules/.bin/jscs ."
+    "lint": "./node_modules/.bin/jshint . && ./node_modules/.bin/jscs .",
+    "test": "./node_modules/.bin/mocha ./test --recursive"
   }
 }

@@ -40,14 +40,14 @@ function init(cliArgs) {
 	}
 
 	// check auth file
-	utils.readJson(config.authPath)
+	return utils.readJson(config.authPath)
 		.then(authData => utils.isValidAuth(authData))
 		.then(res => {
 			options.auth = res;
 			return generate(options);
 		})
 		.catch(err => {
-			reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
+			return reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
 		});
 }
 /**
@@ -62,37 +62,37 @@ function init(cliArgs) {
  *		replaceExisting: {Boolean} replace existing GPM playlist if there is a match
  *	}
  */
-function generate(options) {
+async function generate (options) {
 
 	reporter.info('Generating a playlist from: ' + options.url + '...');
 
 	// init PlayMusic
-	PM.init(options.auth)
-		.then(() => {
-			return fetchPlrTracklist(options)
-				.then(plrTracklist => {
-					reporter.info(
-						'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
-						'\n\nSearching Google Play Music for matching tracks...'
-					);
-					return plrTracklist;
-				});
-		})
-		.then(plrTracklist => {
-			return fetchGPMStoreIds(plrTracklist.track_list, options)
-				.then(matchedTracklist => {
-					reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
-					return Object.assign(plrTracklist, matchedTracklist);
-				});
-		})
-		.then(matchedPlrTracklist => {
-			reporter.info('\nPushing playlist to Google Play Music...');
-			return pushGPMPlaylist(matchedPlrTracklist, options);
-		})
-		.then(reporter.finish)
-		.catch(err => {
-			reporter.exit(new Error('There was a problem connecting to Google Play Music' + '\nDetails: ' + err.message));
-		});
+	try {
+		await PM.init(options.auth);
+
+		const plrTracklist = await fetchPlrTracklist(options);
+
+		reporter.info(
+			'Playlist \"' + plrTracklist.playlist_name + '\" at ' + plrTracklist.playlist_source + ' is ' + plrTracklist.track_list.length + ' tracks long ' +
+			'\n\nSearching Google Play Music for matching tracks...'
+		);
+
+		const matchedTracklist = await fetchGPMStoreIds(plrTracklist.track_list, options);
+
+		reporter.info('Finished searching Google Play Music, matched ' + matchedTracklist.matches + ' of ' + matchedTracklist.track_list.length + ' tracks');
+
+		const matchedPlrTracklist = Object.assign({}, plrTracklist, matchedTracklist);
+
+		reporter.info('\nPushing playlist to Google Play Music...');
+
+		const report = await pushGPMPlaylist(matchedPlrTracklist, options);
+
+		reporter.finish(report);
+
+	}
+	catch (e) {
+		reporter.exit(new Error('There was a problem connecting to Google Play Music' + '\nDetails: ' + err.message));
+	}
 
 }
 /**
@@ -101,8 +101,13 @@ function generate(options) {
  * @param {Object} options - app options
  */
 function fetchPlrTracklist(options) {
+	console.log('fetching', options)
 	return fetch(options.url)
-		.then(res => res.text())
+		.then(res => {
+			console.log('response')
+			console.log(res.status)
+			return res.text()
+		})
 		.then(body => parsePlrTracklist(body, options.url, options.schema))
 		.catch(err => {
 			err.message = 'There was an error with the content of: ' + options.url + '\nDetails: ' + err.message;
