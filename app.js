@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const chalk = require('chalk');
 const cheerio = require('cheerio');
 const readlineSync = require('readline-sync');
+const _get = require('lodash.get');
 
 const reporter = require('./lib/reporter');
 const PM = require('./lib/pm');
@@ -24,7 +25,7 @@ module.exports = init;
  *		replaceExisting: {Boolean} replace existing GPM playlist if there is a match
  *	}
  */
-function init(cliArgs) {
+async function init(cliArgs) {
 	// set up generate options
 	const options = {
 		url: cliArgs.station ? config.presetStations[cliArgs.station] : cliArgs.url,
@@ -40,15 +41,16 @@ function init(cliArgs) {
 	}
 
 	// check auth file
-	return utils.readJson(config.authPath)
-		.then(authData => utils.isValidAuth(authData))
-		.then(res => {
-			options.auth = res;
-			return generate(options);
-		})
-		.catch(err => {
-			return reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
-		});
+	try {
+		const authData = await utils.readJson(config.authPath);
+		utils.isValidAuth(authData);
+		options.auth = authData;
+		await generate(options);
+	}
+	catch (e) {
+		return reporter.exit(new Error('Need to authorise gpm-playlister first, run the login command.\nDetails: ' + err.message));
+	}
+
 }
 /**
  * GENERATE
@@ -156,7 +158,7 @@ function parsePlrTracklist(htmlString, sourceUrl, schema) {
  * @param {Object} options - app options
  * @callback {err, Array} - storeIds - an array of GPM-Store-IDs
  */
-function fetchGPMStoreIds(trackList, options) {
+async function fetchGPMStoreIds(trackList, options) {
 	var response = {
 		track_list: trackList,
 		matches: 0
@@ -172,26 +174,25 @@ function fetchGPMStoreIds(trackList, options) {
 			});
 	});
 
-	return Promise.all(searches)
-			.then(tracks => {
-				const matches = tracks.map(t => {
-					return matchTrackResult(t, options)
-						.then(match => {
-							if (match.storeId) {
-								response.matches++;
-								t.gpmStoreId = match.storeId;
-							} else {
-								reporter.match(null, t);
-							}
-							return t;
-						});
-				});
-				return Promise.all(matches);
-			})
-			.then(res => {
-				response.track_list = res;
-				return response;
+
+	const tracks = await Promise.all(searches);
+
+	const matches = tracks.map(t => {
+		return matchTrackResult(t, options)
+			.then(match => {
+				if (match.storeId) {
+					response.matches++;
+					t.gpmStoreId = match.storeId;
+				} else {
+					reporter.match(null, t);
+				}
+				return t;
 			});
+	});
+
+	response.track_list = await Promise.all(matches);
+
+	return response;
 }
 /**
  * FIND A MATCHING TRACK IN A LIST OF RESULTS
@@ -339,7 +340,7 @@ function getGPMPlaylistId(name, options) {
 
 			let match;
 			// Replace an existing playlist
-			if (playlists && playlists.data && playlists.data.items) {
+			if (_get(playlists, 'data.items')) {
 				match = playlists.data.items
 					.find(item => utils.isPlaylistNameMatch(item, name));
 			}
@@ -449,7 +450,7 @@ function appendGPMPlaylist(playlistId, storeIdList) {
 function getPlaylistUrl(playlistId) {
 	return PM.getPlayLists().then(playlists => {
 			// find match
-			if (playlists && playlists.data && playlists.data.items) {
+			if (_get(playlists, 'data.items')) {
 				return playlists.data.items.find(item => item.id === playlistId);
 			}
 		})
